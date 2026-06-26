@@ -146,6 +146,15 @@
                 <span class="text-xs text-slate-500 font-semibold">1 / 2 단계</span>
             </div>
 
+            <!-- Nickname / Name Input -->
+            <div class="space-y-2 bg-slate-900/30 p-4 rounded-xl border border-slate-850">
+                <label for="nickname-input" class="block text-xs md:text-sm font-semibold text-slate-200 flex items-center gap-2">
+                    <span class="w-1.5 h-3 bg-amber-400 rounded-sm"></span> 닉네임 또는 이름
+                </label>
+                <input type="text" id="nickname-input" maxlength="30" placeholder="예: 리오, 이야기정원, 내 이름 등" class="w-full p-3 rounded-lg bg-slate-950 border border-slate-800 focus:border-amber-400 focus:outline-none text-xs md:text-sm text-slate-200 transition" autocomplete="nickname">
+                <p class="text-[10px] text-slate-500 leading-relaxed">결과 보고서와 아카이브에 표시될 이름입니다. 직접 키보드로 입력하세요.</p>
+            </div>
+
             <!-- Q1. Battery Type (Attitude) -->
             <div class="space-y-4">
                 <h3 class="text-xs md:text-sm font-semibold text-slate-200 flex items-center gap-2">
@@ -541,6 +550,32 @@
             </div>
         </section>
     </main>
+
+    <!-- Archive password modal -->
+    <div id="archive-password-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
+        <div class="bg-[#0c0f1e] border border-amber-900/40 rounded-2xl max-w-sm w-full p-6 space-y-4 shadow-2xl animate-fade-in">
+            <div class="flex items-start gap-3">
+                <div class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center shrink-0">
+                    <i class="fa-solid fa-lock text-amber-400"></i>
+                </div>
+                <div>
+                    <h3 class="font-bold text-white text-sm">내 아카이브 비밀번호 확인</h3>
+                    <p class="text-[10px] text-slate-400 mt-1 leading-relaxed">아카이브 보관소는 비밀번호를 입력해야 열람할 수 있습니다.</p>
+                </div>
+            </div>
+
+            <div class="space-y-2">
+                <label for="archive-password-input" class="text-xs font-semibold text-slate-300">비밀번호</label>
+                <input type="password" id="archive-password-input" inputmode="numeric" placeholder="비밀번호 입력" onkeydown="if(event.key === 'Enter') checkArchivePassword()" class="w-full p-3 rounded-xl bg-slate-950 border border-slate-800 focus:border-amber-400 focus:outline-none text-sm text-slate-200 tracking-widest">
+                <p id="archive-password-error" class="hidden text-[10px] text-red-400">비밀번호가 맞지 않습니다. 다시 입력해 주세요.</p>
+            </div>
+
+            <div class="flex justify-end gap-2 text-xs pt-1">
+                <button onclick="closeArchivePasswordModal()" class="bg-slate-900 text-slate-400 px-4 py-2 rounded-xl border border-slate-800 cursor-pointer hover:bg-slate-850">취소</button>
+                <button onclick="checkArchivePassword()" class="bg-amber-600 hover:bg-amber-500 text-white font-bold px-4 py-2 rounded-xl cursor-pointer">확인</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Archive modal -->
     <div id="archive-modal" class="hidden fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4">
@@ -1401,6 +1436,8 @@
 
             const typeInfo = feynmanDatabase[currentActiveType] || feynmanDatabase["ET"];
             const currentRoom = gardenRooms[activeRoomId];
+            const nickname = getNickname();
+            document.getElementById('report-title-top').innerText = `${nickname}님의 내 마음 보고서`;
 
             // Render type metrics
             document.getElementById('type-badge-icon').innerText = currentActiveType;
@@ -1577,6 +1614,7 @@
             const typeInfo = feynmanDatabase[currentActiveType] || feynmanDatabase["ET"];
 
             const textSummary = `[쉽게 만나는 내 마음 보고서 - 이야기 정원]
+작성자: ${getNickname()}
             
 🌱 나의 기본 마음 유형: ${typeInfo.feynmanTitle} (${currentActiveType})
 🧭 오늘의 마음 정원: ${gardenRooms[activeRoomId].name} - ${activeCardName}
@@ -1612,6 +1650,7 @@
 
             const blogTemplate = `--------------------------------------------------
 [마음 에세이] 이야기 정원에서 쉽게 만난 내 마음 보고서
+작성자: ${getNickname()}
 --------------------------------------------------
 
 오늘 나는 내 영혼의 안식을 위해 '이야기 정원'을 산책하고 내면의 지도를 그려보았다.
@@ -1680,6 +1719,11 @@
         }
 
         const LOCAL_STORAGE_KEY = 'story_garden_archive_v5';
+        const ARCHIVE_PASSWORD = '3766';
+
+        function getNickname() {
+            return (document.getElementById('nickname-input')?.value || '').trim() || '이름 없는 정원 산책자';
+        }
 
         function getStoredArchives() {
             const raw = localStorage.getItem(LOCAL_STORAGE_KEY);
@@ -1695,6 +1739,7 @@
 
             const newArchive = {
                 id: Date.now(),
+                nickname: getNickname(),
                 date: new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }),
                 typeCode: currentActiveType,
                 typeTitle: typeInfo.title,
@@ -1717,9 +1762,45 @@
 
         function toggleArchiveModal() {
             const modal = document.getElementById('archive-modal');
-            modal.classList.toggle('hidden');
             if (!modal.classList.contains('hidden')) {
+                modal.classList.add('hidden');
+                return;
+            }
+
+            const pwModal = document.getElementById('archive-password-modal');
+            const pwInput = document.getElementById('archive-password-input');
+            const pwError = document.getElementById('archive-password-error');
+            pwError.classList.add('hidden');
+            pwInput.value = '';
+            pwModal.classList.remove('hidden');
+            setTimeout(() => pwInput.focus(), 50);
+        }
+
+        function closeArchivePasswordModal() {
+            document.getElementById('archive-password-modal').classList.add('hidden');
+            document.getElementById('archive-password-input').value = '';
+            document.getElementById('archive-password-error').classList.add('hidden');
+        }
+
+        function checkArchivePassword() {
+            const pwInput = document.getElementById('archive-password-input');
+            const pwError = document.getElementById('archive-password-error');
+            const archiveModal = document.getElementById('archive-modal');
+            const pwModal = document.getElementById('archive-password-modal');
+
+            if (pwInput.value === ARCHIVE_PASSWORD) {
+                pwModal.classList.add('hidden');
+                pwInput.value = '';
+                pwError.classList.add('hidden');
                 renderArchiveList();
+                archiveModal.classList.remove('hidden');
+                showToast('🔓 아카이브 보관소가 열렸습니다.', 'success');
+            } else {
+                archiveModal.classList.add('hidden');
+                pwError.classList.remove('hidden');
+                pwInput.value = '';
+                pwInput.focus();
+                showToast('비밀번호가 맞지 않아 아카이브를 열 수 없습니다.', 'error');
             }
         }
 
@@ -1742,6 +1823,7 @@
                     <div class="flex justify-between items-start gap-2">
                         <div>
                             <span class="text-[9px] text-emerald-400 font-bold block">${item.date}</span>
+                            <span class="text-[9px] text-amber-300 font-semibold block mt-0.5">작성자: ${item.nickname || '이름 없는 정원 산책자'}</span>
                             <h4 class="font-bold text-slate-200 text-xs mt-0.5">${item.typeTitle}</h4>
                             <span class="inline-block mt-1 text-[9px] bg-indigo-950/40 text-indigo-300 px-2 py-0.5 rounded border border-indigo-900/35">
                                 ${item.roomName} / ${item.cardName}
